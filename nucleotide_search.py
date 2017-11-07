@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import csv
 import os
 import queue
 import re
@@ -132,14 +133,18 @@ def create_efetch_url( args ):
 	return urllib.parse.urlunparse( url_parts )
 
 
-def find_user_regex( source_f, pattern_re ):
-	for event, el in xml.etree.ElementTree.iterparse( source_f ):
-		if el.tag == 'TSeq_sequence':
-			m = pattern_re.search( el.text )
-			while m:
-				print(m)
-				m = pattern_re.search(el.text, m.end())
-		el.clear()
+def find_user_regex( source_f, pattern_re, csv_fname ):
+	with open(csv_fname, 'w', newline='') as csvf:
+		csvwriter = csv.writer(csvf, quoting=csv.QUOTE_MINIMAL)
+		for event, el in xml.etree.ElementTree.iterparse( source_f ):
+			if el.tag == 'TSeq_sequence':
+				m = pattern_re.search( el.text )
+				while m:
+					# +1 = non-CS folks think 1-based.  Who knew?!?! ;-)
+					start, end = m.start() + 1, m.end()
+					csvwriter.writerow((m.group(), start, end))
+					m = pattern_re.search(el.text, end)
+			el.clear()
 
 
 if '__main__' == __name__:
@@ -173,6 +178,7 @@ if '__main__' == __name__:
 	parser.add_argument('--dbname', default="nucleotide", type=dbname_format, help="NCBI database name. [nucleotide]")
 	parser.add_argument('--dbid',   default="30271926", type=dbid_format, help="NCBI database identifier. [30271926]")
 	parser.add_argument('--regex',  default="AAAATAGCCCC", help="Regular expression search pattern. [AAAATAGCCCC]")
+	parser.add_argument('--ofname', required=True, help="Output file name to write results (CSV format). Ex: 'results.csv'")
 	parser.add_argument('--save-nucleotide', action='store_true', help="Save network result to a local file for later use with --localsource; useful for iteration as large file does not have to be re-downloaded")
 	parser.add_argument('--localsource', help="Use a local file instead of making a (slow) network request")
 	parser.add_argument('--debug', action='store_true', help="Rather than the simplistic error messages, show developer-useful information (i.e., tracebacks).")
@@ -183,7 +189,7 @@ if '__main__' == __name__:
 
 	if args.localsource:
 		with open(args.localsource, 'rb') as srcf:
-			find_user_regex(srcf, pattern_re)
+			find_user_regex(srcf, pattern_re, args.ofname)
 
 	else:
 		url = create_efetch_url( args )
@@ -205,4 +211,4 @@ if '__main__' == __name__:
 					sys.stderr.write('File saved locally to: {}\n'.format( save_name ))
 
 			tmpf.seek(0)
-			find_user_regex(tmpf, pattern_re)
+			find_user_regex(tmpf, pattern_re, args.ofname)
