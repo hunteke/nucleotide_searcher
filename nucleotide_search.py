@@ -139,19 +139,17 @@ def create_efetch_url( args ):
 	return urllib.parse.urlunparse( url_parts )
 
 
-def find_user_regex( source_f, pattern_re, csv_fname ):
-	with open(csv_fname, 'w', newline='') as csvf:
-		csvwriter = csv.writer(csvf, quoting=csv.QUOTE_MINIMAL)
-		stats = collections.defaultdict(int)
+def find_user_regex( source_f, pattern_re, csvwriter ):
+	stats = collections.defaultdict(int)
 
-		for event, el in xml.etree.ElementTree.iterparse( source_f ):
-			if el.tag == 'TSeq_sequence':
-				for m in pattern_re.finditer( el.text ):
-					# +1 = non-CS folks think 1-based.  Who knew?!?! ;-)
-					start, end = m.start() + 1, m.end()
-					stats[ m.group() ] += 1
-					csvwriter.writerow((m.group(), start, end))
-			el.clear()
+	for event, el in xml.etree.ElementTree.iterparse( source_f ):
+		if el.tag == 'TSeq_sequence':
+			for m in pattern_re.finditer( el.text ):
+				# +1 = non-CS folks think 1-based.  Who knew?!?! ;-)
+				start, end = m.start() + 1, m.end()
+				stats[ m.group() ] += 1
+				csvwriter.writerow((m.group(), start, end))
+		el.clear()
 
 	sorted_by_occurrence = sort_by_value(stats, reverse=True)
 	if sorted_by_occurrence:
@@ -202,8 +200,9 @@ if '__main__' == __name__:
 	pattern_re = re.compile( args.regex )
 
 	if args.localsource:
-		with open(args.localsource, 'rb') as srcf:
-			find_user_regex(srcf, pattern_re, args.ofname)
+		with open(args.localsource, 'rb') as srcf, open(csv_fname, 'w', newline='') as csvf:
+			csvwriter = csv.writer(csvf, quoting=csv.QUOTE_MINIMAL)
+			find_user_regex(srcf, pattern_re, csvwriter)
 
 	else:
 		url = create_efetch_url( args )
@@ -225,4 +224,6 @@ if '__main__' == __name__:
 					sys.stderr.write('File saved locally to: {}\n'.format( save_name ))
 
 			tmpf.seek(0)
-			find_user_regex(tmpf, pattern_re, args.ofname)
+			with open(csv_fname, 'w', newline='') as csvf:
+				csvwriter = csv.writer(csvf, quoting=csv.QUOTE_MINIMAL)
+				find_user_regex(tmpf, pattern_re, csvwriter)
