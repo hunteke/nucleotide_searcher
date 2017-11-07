@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+import xml.etree.ElementTree
 import zlib
 
 from functools import reduce
@@ -131,6 +132,16 @@ def create_efetch_url( args ):
 	return urllib.parse.urlunparse( url_parts )
 
 
+def find_user_regex( source_f, pattern_re ):
+	for event, el in xml.etree.ElementTree.iterparse( source_f ):
+		if el.tag == 'TSeq_sequence':
+			m = pattern_re.search( el.text )
+			while m:
+				print(m)
+				m = pattern_re.search(el.text, m.end())
+		el.clear()
+
+
 if '__main__' == __name__:
 	import argparse
 
@@ -161,14 +172,18 @@ if '__main__' == __name__:
 	parser.add_argument('--baseurl', default='http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi', help='The base URL from which to fetch data.')
 	parser.add_argument('--dbname', default="nucleotide", type=dbname_format, help="NCBI database name. [nucleotide]")
 	parser.add_argument('--dbid',   default="30271926", type=dbid_format, help="NCBI database identifier. [30271926]")
+	parser.add_argument('--regex',  default="AAAATAGCCCC", help="Regular expression search pattern. [AAAATAGCCCC]")
 	parser.add_argument('--save-nucleotide', action='store_true', help="Save network result to a local file for later use with --localsource; useful for iteration as large file does not have to be re-downloaded")
 	parser.add_argument('--localsource', help="Use a local file instead of making a (slow) network request")
 	parser.add_argument('--debug', action='store_true', help="Rather than the simplistic error messages, show developer-useful information (i.e., tracebacks).")
 	args = parser.parse_args()
 
+	# prepare user's regex
+	pattern_re = re.compile( args.regex )
+
 	if args.localsource:
 		with open(args.localsource, 'rb') as srcf:
-			print(srcf.read())    # TODO: not memory smart.
+			find_user_regex(srcf, pattern_re)
 
 	else:
 		url = create_efetch_url( args )
@@ -190,4 +205,4 @@ if '__main__' == __name__:
 					sys.stderr.write('File saved locally to: {}\n'.format( save_name ))
 
 			tmpf.seek(0)
-			print( tmpf.read() )    # TODO: not memory smart
+			find_user_regex(tmpf, pattern_re)
