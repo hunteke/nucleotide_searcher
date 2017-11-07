@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 import gzip
+import os
 import re
+import sys
+import tempfile
+import time
 import urllib.request
 
 def msg_and_die( msg ):
@@ -79,8 +83,33 @@ if '__main__' == __name__:
 	parser.add_argument('--baseurl', default='http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi', help='The base URL from which to fetch data.')
 	parser.add_argument('--dbname', default="nucleotide", type=dbname_format, help="NCBI database name. [nucleotide]")
 	parser.add_argument('--dbid',   default="30271926", type=dbid_format, help="NCBI database identifier. [30271926]")
+	parser.add_argument('--save-nucleotide', action='store_true', help="Save network result to a local file for later use with --localsource; useful for iteration as large file does not have to be re-downloaded")
+	parser.add_argument('--localsource', help="Use a local file instead of making a (slow) network request")
 	parser.add_argument('--debug', action='store_true', help="Rather than the simplistic error messages, show developer-useful information (i.e., tracebacks).")
 	args = parser.parse_args()
 
-	url = create_efetch_url( args )
-	print( read_url( url ))
+	if args.localsource:
+		with open(args.localsource, 'rb') as srcf:
+			print(srcf.read())    # TODO: not memory smart.
+
+	else:
+		url = create_efetch_url( args )
+		with tempfile.NamedTemporaryFile(mode='r+b') as tmpf:
+			tmpf.write( read_url( url ))    # TODO: not memory smart
+
+			if args.save_nucleotide:
+				# ex: "nucleotide-30271926-20171105.xml"
+				save_name = "{}-{}-{}.xml".format(args.dbname, args.dbid, time.strftime('%Y%m%d'))
+				try:
+					os.link(tmpf.name, save_name)
+				except OSError as e:
+					# failed once; perhaps a cross-device or other issue; let's try a
+					# second write operation (rather than a shutil.copy so script
+					# will still succeed inside of Window's weird access rules.)
+					tmpf.seek(0)
+					with open(save_name, 'wb') as savef:
+						savef.write( tmpf.read() )    # TODO: not memory smart
+					sys.stderr.write('File saved locally to: {}\n'.format( save_name ))
+
+			tmpf.seek(0)
+			print( tmpf.read() )    # TODO: not memory smart
