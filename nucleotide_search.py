@@ -112,6 +112,18 @@ def stream_read( fileObj, chunksize=64*1024, filter_funcs=[] ):
 
 
 def write_file_stream( q, fileObj ):
+	"""Write a file-like object in parts.
+
+	Iterate q (queue.Queue), writing each received item to fileObj.  When
+	there are no more items in the queue, flush the file and attempt to shut
+	the queue down.
+
+	Args:
+		q (queue.Queue): a queue from which to receive consecutive pieces of a
+		  file
+		fileObj (file-like object): must implement the .read() method of the
+		  Python file-API
+	"""
 	chunk = q.get()
 	while chunk:
 		fileObj.write( chunk )
@@ -140,6 +152,17 @@ def create_efetch_url( args ):
 
 
 def find_user_regex( source_f, pattern_re, csvwriter ):
+	"""Search XML source for pattern, writing found items to CSV
+
+	Each line of the output CSV will contain a found pattern, and how many
+	characters into the nucleotide it was found.  Of note: the first character
+	in the sequence is considered to be at index 1.
+
+	Args:
+		source_f (fileObj): an XML source, containing a TSeq_sequence tag
+		pattern_re (regex): a compiled regular expression, for searching source_f
+		csvwriter: a csvwriter object where results will be written
+	"""
 	stats = collections.defaultdict(int)
 
 	for event, el in xml.etree.ElementTree.iterparse( source_f ):
