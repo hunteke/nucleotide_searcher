@@ -15,6 +15,7 @@ def read_url( url ):
 	req = urllib.request.Request( url )
 	req.add_header('Accept-Encoding', 'gzip')  # Let server send compressed data
 	req.add_header('Cache-Control', 'max-age=0')   # Attempt to ensure a 'fresh' copy
+	req.add_header('User-Agent', 'Python3-based research script, urllib')
 
 	try:
 		res = urllib.request.urlopen( req )
