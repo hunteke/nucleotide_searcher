@@ -42,14 +42,26 @@ optional arguments:
                         developer-useful information (i.e., tracebacks)
 ```
 
-In short, the default values are chosen to be fast (against the small
+The default values are chosen to be fast (e.g., against the small
 SARS Corono virus nucleotide sequence, a search pattern that does not
 exist), and the only required argument is `--ofname` to specify the
-filename of where to place the CSV results.
+filename of where to place the CSV results.  Thus, the simplest
+invocation might be:
+
+```
+$ ./nucleotide_search.py --ofname 'test.csv'
+No matching sequences found.
+```
 
 An invocation that uses all of the problem flags might be:
 
-`$ ./nucleotide_search.py --dbname nucleotide --dbid 224589800 --regex '(A|C|G|T)' --ofname out.csv`
+```
+$ ./nucleotide_search.py --dbname nucleotide --dbid 224589800 --regex '(A|C|G|T)' --ofname out.csv
+T       65668756
+A       65570891
+C       47024412
+G       47016562
+```
 
 For iteration, it will likely be considerably faster to cache the
 downloaded nucleotide XML data.  First:
@@ -67,36 +79,66 @@ Now, using `--localsource`, the refined search can immediately process
 rather than waiting for a quarter of a gigabyte to redownload:
 
 ```
-$ ./nucleotide_search.py --localsource ./nucleotide-224589800-20171107.xml --ofname out2.csv --regex '(AAAAA|CCCCC|GGGGG|TACGGCAT)'
-AAAAA   786514
+$ ./nucleotide_search.py --localsource ./nucleotide-224589800-20171107.xml --ofname out2.csv --regex '(CCCCC|GGGGG|TACGGCAT)'
 CCCCC   133642
 GGGGG   133126
 TACGGCAT        349
-
 ```
 
 ## Design choices
 
  * Given the choice of making this Python 2 and 3 compatible, I opted to
-   create this strictly in Python 3.   The biggest reason is that Python
-   2 is inside of 3 years until end-of-life (2020).  That said, if
+   create it strictly in Python 3.   The biggest reason is that Python 2
+   is inside of 3 years until end-of-life (2020).  That said, if
    Python 2 compatability is required, there are only a couple of pain
    points to work through (mainly in the URL parsing)
 
  * Given how large genomic research data can get, I opted for a
    streaming approach.  Wherever possible, the script streams data and
-   frees what is no longer needed.  For example, the
+   frees what is no longer needed.  Three examples:
 
-   * downloader works in a separate thread retrieving small chunks of
-     the URL file, putting each consecutive piece into a queue.   At the
-     same time, another thread writes those pieces to a temporary file.
-     For at least the file download portion of the script, the whole
-     file will never be in memory at the same time.
+   * The downloader works in a separate thread retrieving small chunks
+     of the URL file, putting each consecutive piece into a queue.   At
+     the same time, another thread writes those pieces to a temporary
+     file.  For at least the file download portion of the script, the
+     whole file will never be in memory at the same time.
 
-   * xml parsing stage clears each element from memory once processing
-     is complete
+   * The XML parsing stage clears each element from memory once
+     processing is complete
+
+   * Searching is iterative with .finditer() rather than finding all
+     occurrences at once
 
  * I chose ElementTree over the more traditional expat library for
    parsing the XML.  My main reasoning is it is a much simpler API and
    had all the required functionality for this project
+
+
+## Part II Example run:
+
+```
+$ ./nucleotide_search.py --dbname nucleotide --dbid 224589800 --ofname "out.csv" --regex "(A|C|G|T)"
+T       65668756
+A       65570891
+C       47024412
+G       47016562
+
+  # omitting out.csv since it is 4.7G
+$ ll out.csv
+-rw-r--r-- 1 kevin kevin 4.7G Nov  7 02:29 out.csv
+
+$ md5sum out.csv
+4ab56d7958da0588ed6c89bb4e42e1ac  out.csv
+
+$ head out.csv
+T,10001,10001
+A,10002,10002
+A,10003,10003
+C,10004,10004
+C,10005,10005
+C,10006,10006
+T,10007,10007
+A,10008,10008
+A,10009,10009
+C,10010,10010
 
