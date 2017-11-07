@@ -146,13 +146,11 @@ def find_user_regex( source_f, pattern_re, csv_fname ):
 
 		for event, el in xml.etree.ElementTree.iterparse( source_f ):
 			if el.tag == 'TSeq_sequence':
-				m = pattern_re.search( el.text )
-				while m:
+				for m in pattern_re.finditer( el.text ):
 					# +1 = non-CS folks think 1-based.  Who knew?!?! ;-)
 					start, end = m.start() + 1, m.end()
 					stats[ m.group() ] += 1
 					csvwriter.writerow((m.group(), start, end))
-					m = pattern_re.search(el.text, end)
 			el.clear()
 
 	sorted_by_occurrence = sort_by_value(stats, reverse=True)
