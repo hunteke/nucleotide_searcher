@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import gzip
 import urllib.request
 
 def msg_and_die( msg ):
@@ -12,6 +13,7 @@ def msg_and_die( msg ):
 
 def read_url( url ):
 	req = urllib.request.Request( url )
+	req.add_header('Accept-Encoding', 'gzip')  # Let server send compressed data
 
 	try:
 		res = urllib.request.urlopen( req )
@@ -20,7 +22,12 @@ def read_url( url ):
 	except urllib.error.URLError as e:
 		msg_and_die( 'Attempted url: {}\nUnable to make connection; check your internet connection?\nLibrary error message: {}'.format(url, e) )
 
-	return res.read()
+	data = res.read()
+	encoding = res.info().get('Content-Encoding') or ''
+	if 'gzip' in encoding.lower():
+		data = gzip.decompress( data )
+
+	return data
 
 
 parser = argparse.ArgumentParser(
