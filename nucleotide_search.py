@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
-import gzip
 import os
+import queue
 import re
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
+import zlib
+
+from functools import reduce
 
 def msg_and_die( msg ):
 	if args.debug:
@@ -15,7 +19,21 @@ def msg_and_die( msg ):
 	raise SystemExit( "{}\n\nUse --debug for developer friendly information\n".format(msg) )
 
 
-def read_url( url ):
+def read_url_stream( url ):
+	"""Retrieve data from `url`, in a streaming fashion
+
+	Will read HTTP data, placing each consecutive chunk into a queue
+	(queue.Queue).  When read operaion is complete, the queue will contain a
+	final None sentinel value.
+
+	Args:
+		url (str): A valid URL from which to read data.
+
+	Returns:
+		A queue (queue.Queue) that will contain consecutive pieces as the read
+		task progresses.  When the read operation is complete, a sentinel None
+		will be placed in the queue.
+	"""
 	req = urllib.request.Request( url )
 	req.add_header('Accept-Encoding', 'gzip')  # Let server send compressed data
 	req.add_header('Cache-Control', 'max-age=0')   # Attempt to ensure a 'fresh' copy
@@ -28,12 +46,72 @@ def read_url( url ):
 	except urllib.error.URLError as e:
 		msg_and_die( 'Attempted url: {}\nUnable to make connection; check your internet connection?\nLibrary error message: {}'.format(url, e) )
 
-	data = res.read()
+	filter_funcs = []
 	encoding = res.info().get('Content-Encoding') or ''
 	if 'gzip' in encoding.lower():
-		data = gzip.decompress( data )
+		filter_funcs.append( zlib.decompressobj(16+zlib.MAX_WBITS).decompress )
 
-	return data
+	return stream_read(res, filter_funcs=filter_funcs)
+
+
+def stream_read( fileObj, chunksize=64*1024, filter_funcs=[] ):
+	"""Read a file-like object in parts.
+
+	Reads consecutive chunksize chunks of data from fileObj, placing each
+	chunk/part into a queue (queue.Queue).  When all data has been read, will
+	place a sentinel None into the queue.
+
+	Args:
+		fileObj (file-like object): must implement the .read() method of the
+		  Python file-API
+		chunksize (non-negative integer): size of chunks to read from fileObj.
+		  Default: 64KiB
+		filter_funcs (list of functions): a list of filtering functions to be
+		  applied to each chunk before it reaches the queue.  For example, to
+		  uncompress each chunk, [zlib.dcompressobj().decompress]
+
+	Returns:
+		A queue (queue.Queue) that will contain consecutive pieces as the read
+		task progresses.  When the read operation is complete, a sentinel None
+		will be placed in the queue.
+	"""
+	def _reader(q, chunksize, filter_funcs):
+		# The kernel for a n-ary set of operations ( fn(...f3(f2(f1(data)))...) ).
+		# Necessary in this small project to enable handling of GZIP data, above
+		reduce_func = lambda res, fn: fn( res )
+
+		chunk = fileObj.read( chunksize )
+		while chunk:
+			chunk = reduce(reduce_func, filter_funcs, chunk)
+			q.put( chunk )
+			chunk = fileObj.read( chunksize )
+		q.put( None )
+		q.join()
+
+	if not isinstance(chunksize, int) or chunksize < 1:
+		raise ValueError('chunksize: must be a positive integer; suggest a power of 2.  Invalid value: {}'.format(chunksize))
+
+	# we'll die harder if filter_funcs is not iterable, but that's okay.  We're
+	# just helping this coder out for now.
+	for i, f in enumerate(filter_funcs):
+		if not callable( f ):
+			raise ValueError('filter_funcs: must only contain callable items.  Invalid item (index: {}): {}'.format(i, f))
+
+	chunks_q = queue.Queue( maxsize=16 )
+	threading.Thread(target=_reader, args=(chunks_q, chunksize, filter_funcs)).start()
+
+	return chunks_q
+
+
+def write_file_stream( q, fileObj ):
+	chunk = q.get()
+	while chunk:
+		fileObj.write( chunk )
+		q.task_done()
+		chunk = q.get()
+	fileObj.flush()
+	q.task_done()
+	q.join()
 
 
 def create_efetch_url( args ):
@@ -95,7 +173,7 @@ if '__main__' == __name__:
 	else:
 		url = create_efetch_url( args )
 		with tempfile.NamedTemporaryFile(mode='r+b') as tmpf:
-			tmpf.write( read_url( url ))    # TODO: not memory smart
+			write_file_stream(read_url_stream(url), tmpf)
 
 			if args.save_nucleotide:
 				# ex: "nucleotide-30271926-20171105.xml"
@@ -108,7 +186,7 @@ if '__main__' == __name__:
 					# will still succeed inside of Window's weird access rules.)
 					tmpf.seek(0)
 					with open(save_name, 'wb') as savef:
-						savef.write( tmpf.read() )    # TODO: not memory smart
+						write_file_stream(stream_read(tmpf), savef)
 					sys.stderr.write('File saved locally to: {}\n'.format( save_name ))
 
 			tmpf.seek(0)
