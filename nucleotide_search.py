@@ -155,16 +155,10 @@ def find_user_regex( source_f, pattern_re, csv_fname ):
 					m = pattern_re.search(el.text, end)
 			el.clear()
 
-	max_group_len = -1
-	try:
-		max_group_len = max(len(k) for k in stats.keys())
-	except:
-		pass
 	sorted_by_occurrence = sort_by_value(stats, reverse=True)
-	if max_group_len > 0:
-		fmt = "{{:{}}}  {{}}".format( max_group_len )
+	if sorted_by_occurrence:
 		for k, v in sorted_by_occurrence:
-			print(fmt.format(k, v))
+			print("{}\t{}".format(k, v))
 	else:
 		print("No matching sequences found.")
 
