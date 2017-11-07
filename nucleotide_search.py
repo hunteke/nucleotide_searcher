@@ -209,7 +209,7 @@ if '__main__' == __name__:
 	parser = argparse.ArgumentParser(
 		description='Search for nucleotide sequences.'
 	)
-	parser.add_argument('--baseurl', default='http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi', help='The base URL from which to fetch data.')
+	parser.add_argument('--baseurl', default='http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi', help='The base URL from which to fetch data. [http://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi]')
 	parser.add_argument('--dbname', default="nucleotide", type=dbname_format, help="NCBI database name. [nucleotide]")
 	parser.add_argument('--dbid',   default="30271926", type=dbid_format, help="NCBI database identifier. [30271926]")
 	parser.add_argument('--regex',  default="AAAATAGCCCC", help="Regular expression search pattern. [AAAATAGCCCC]")
