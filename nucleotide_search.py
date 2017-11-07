@@ -14,6 +14,7 @@ def msg_and_die( msg ):
 def read_url( url ):
 	req = urllib.request.Request( url )
 	req.add_header('Accept-Encoding', 'gzip')  # Let server send compressed data
+	req.add_header('Cache-Control', 'max-age=0')   # Attempt to ensure a 'fresh' copy
 
 	try:
 		res = urllib.request.urlopen( req )
