@@ -223,7 +223,7 @@ if '__main__' == __name__:
 	pattern_re = re.compile( args.regex )
 
 	if args.localsource:
-		with open(args.localsource, 'rb') as srcf, open(csv_fname, 'w', newline='') as csvf:
+		with open(args.localsource, 'rb') as srcf, open(args.ofname, 'w', newline='') as csvf:
 			csvwriter = csv.writer(csvf, quoting=csv.QUOTE_MINIMAL)
 			find_user_regex(srcf, pattern_re, csvwriter)
 
@@ -247,6 +247,6 @@ if '__main__' == __name__:
 					sys.stderr.write('File saved locally to: {}\n'.format( save_name ))
 
 			tmpf.seek(0)
-			with open(csv_fname, 'w', newline='') as csvf:
+			with open(args.ofname, 'w', newline='') as csvf:
 				csvwriter = csv.writer(csvf, quoting=csv.QUOTE_MINIMAL)
 				find_user_regex(tmpf, pattern_re, csvwriter)
