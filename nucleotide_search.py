@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
+import collections
 import csv
+import operator
 import os
 import queue
 import re
@@ -19,6 +21,10 @@ def msg_and_die( msg ):
 		raise
 
 	raise SystemExit( "{}\n\nUse --debug for developer friendly information\n".format(msg) )
+
+
+def sort_by_value( d, reverse=False ):
+	return sorted(d.items(), key=operator.itemgetter(1), reverse=reverse)
 
 
 def read_url_stream( url ):
@@ -136,15 +142,31 @@ def create_efetch_url( args ):
 def find_user_regex( source_f, pattern_re, csv_fname ):
 	with open(csv_fname, 'w', newline='') as csvf:
 		csvwriter = csv.writer(csvf, quoting=csv.QUOTE_MINIMAL)
+		stats = collections.defaultdict(int)
+
 		for event, el in xml.etree.ElementTree.iterparse( source_f ):
 			if el.tag == 'TSeq_sequence':
 				m = pattern_re.search( el.text )
 				while m:
 					# +1 = non-CS folks think 1-based.  Who knew?!?! ;-)
 					start, end = m.start() + 1, m.end()
+					stats[ m.group() ] += 1
 					csvwriter.writerow((m.group(), start, end))
 					m = pattern_re.search(el.text, end)
 			el.clear()
+
+	max_group_len = -1
+	try:
+		max_group_len = max(len(k) for k in stats.keys())
+	except:
+		pass
+	sorted_by_occurrence = sort_by_value(stats, reverse=True)
+	if max_group_len > 0:
+		fmt = "{{:{}}}  {{}}".format( max_group_len )
+		for k, v in sorted_by_occurrence:
+			print(fmt.format(k, v))
+	else:
+		print("No matching sequences found.")
 
 
 if '__main__' == __name__:
